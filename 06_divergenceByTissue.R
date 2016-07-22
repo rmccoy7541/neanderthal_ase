@@ -55,15 +55,15 @@ gtex <- fread("~/Desktop/sunjin/GTEx_Analysis_v6_RNA-seq_RNA-SeQCv1.1.8_gene_med
 gtex$GID <- gsub("\\..*", "", gtex$GID)
 
 tissue_names <- data.table(full_name = colnames(gtex)[-c(1:2)], 
-						   abbrev = c("ADPSBQ", "ADPVSC", "ADRNLG", "ARTAORT", "ARTCRN", "ARTTBL",
-						   			  "BLDDER", "BRNAMY", "BRNACC", "BRNCDT", "BRNCHB", "BRNCHA", "BRNCTXA",
-						   			  "BRNCTXB", "BRNHPP", "BRNHPT", "BRNNCC", "BRNPTM", "BRNSPC",
-						   			  "BRNSNG", "BREAST", "LCL", "FIBRBLS", "CVXECT", "CVXEND",
-						   			  "CLNSGM", "CLNTRN", "ESPGEJ", "ESPMCS", "ESPMSL", "FLLPNT",
-						   			  "HRTAA", "HRTLV", "KDNCTX", "LIVER", "LUNG", "SLVRYG", "MSCLSK",
-						   			  "NERVET", "OVARY", "PNCREAS", "PTTARY", "PRSTTE", "SKINNS",
-						   			  "SKINS", "SNTTRM", "SPLEEN", "STMACH", "TESTIS", "THYROID",
-						   			  "UTERUS", "VAGINA", "WHLBLD"))
+                           abbrev = c("ADPSBQ", "ADPVSC", "ADRNLG", "ARTAORT", "ARTCRN", "ARTTBL",
+			              "BLDDER", "BRNAMY", "BRNACC", "BRNCDT", "BRNCHB", "BRNCHA", "BRNCTXA",
+				      "BRNCTXB", "BRNHPP", "BRNHPT", "BRNNCC", "BRNPTM", "BRNSPC",
+				      "BRNSNG", "BREAST", "LCL", "FIBRBLS", "CVXECT", "CVXEND",
+				      "CLNSGM", "CLNTRN", "ESPGEJ", "ESPMCS", "ESPMSL", "FLLPNT",
+				      "HRTAA", "HRTLV", "KDNCTX", "LIVER", "LUNG", "SLVRYG", "MSCLSK",
+				      "NERVET", "OVARY", "PNCREAS", "PTTARY", "PRSTTE", "SKINNS",
+				      "SKINS", "SNTTRM", "SPLEEN", "STMACH", "TESTIS", "THYROID",
+				      "UTERUS", "VAGINA", "WHLBLD"))
 
 colnames(gtex)[-c(1:2)] <- tissue_names$abbrev
 
