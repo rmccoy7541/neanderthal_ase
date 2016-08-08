@@ -1,5 +1,5 @@
 library(data.table)
-library(dplyr)
+library(dtplyr)
 library(parallel)
 library(boot)
 library(INLA)
@@ -70,7 +70,7 @@ glmer_ase <- function(snp, dt) {
 	b10 <- exp(m1$mlik[2] - m0$mlik[2])
 	message(paste("Processed SNP:", snp, b10))
 	results <- data.table(snp = snp, chrom = chrom, pos = pos, gene = gene, BF = b10)
-	write.table(results, "~/tissue_het.txt", sep = "/t", quote = F, header = F, row.names = F, col.names = F, append = T)
+	write.table(results, "~/tissue_het.txt", sep = "/t", quote = F, row.names = F, col.names = F, append = T)
 	return(results)
 }
 
