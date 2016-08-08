@@ -1,6 +1,6 @@
 library(data.table)
 library(ggplot2)
-library(dplyr)
+library(dtplyr)
 library(boot)
 
 tissue_list <- read.table("~/Desktop/ASE/tissues/tissueList.txt", stringsAsFactors = F)$V1
