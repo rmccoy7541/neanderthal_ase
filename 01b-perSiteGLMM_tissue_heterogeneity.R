@@ -6,8 +6,8 @@ library(INLA)
 
 # read ASE read count data
 dt <- fread("/net/akey/vol1/home/rcmccoy/neanderthal_ase/2015_12_15/data/GTEx_MidPoint_Imputation_ASE.expression-matrixfmt-ase.tsv", header = T, verbose = T) %>%
-	mutate(., mergeID = paste(CHR, POS, sep = "_"))
-	
+dt[, mergeID := paste(CHR, POS, sep = "_")]
+
 # get list of high confidence Neandertal tag SNPs
 neand <- fread("/net/akey/vol1/home/rcmccoy/neanderthal_ase/2015_12_15/data/neand_tag_snps_EUR.filtered.txt") %>%
 	setnames(., c("mergeID", "CHR", "POS", "ANC", "DER", "AA_freq", "AFR_freq", "AMR_freq", "EAS_freq", "EUR_freq", "PNG_freq", "SAS_freq", "NEAND_BASE"))
