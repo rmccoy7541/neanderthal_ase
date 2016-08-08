@@ -113,9 +113,6 @@ byTissue[-1,]$quant0.995 <- byTissue[-1,]$quant0.995 + refMean
 # require at least 10 samples per tissue
 byTissue <- byTissue[TISSUE_ID %in% nSamples[nSamples >= 10]$TISSUE_ID]
 
-#write.table(byTissue, file = "~/byTissue.txt", quote = F, col.names = T, row.names = F, sep = "\t")
-#byTissue <- fread("~/Downloads/byTissue.txt")
-
 byTissue$brainIndicator <- FALSE
 byTissue[grepl("BRN", TISSUE_ID),]$brainIndicator <- TRUE
 
