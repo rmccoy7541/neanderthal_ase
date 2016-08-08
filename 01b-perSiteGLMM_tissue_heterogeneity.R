@@ -69,7 +69,9 @@ glmer_ase <- function(snp, dt) {
 	}
 	b10 <- exp(m1$mlik[2] - m0$mlik[2])
 	message(paste("Processed SNP:", snp, b10))
-	return(data.table(snp = snp, chrom = chrom, pos = pos, gene = gene, BF = b10))
+	results <- data.table(snp = snp, chrom = chrom, pos = pos, gene = gene, BF = b10)
+	write.table(results, "~/tissue_het.txt", sep = "/t", quote = F, header = F, row.names = F, col.names = F, append = T)
+	return(results)
 }
 
 n_tissues <- group_by(dt[neandIndicator == T], mergeID) %>%
