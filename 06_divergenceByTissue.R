@@ -1,5 +1,5 @@
 library(data.table)
-library(dplyr)
+library(dtplyr)
 library(parallel)
 library(boot)
 library(INLA)
