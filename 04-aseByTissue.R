@@ -1,35 +1,36 @@
 library(data.table)
-library(ggplot2)
 library(dtplyr)
+library(magrittr)
 library(parallel)
-library(lme4)
-library(car)
+library(boot)
 library(INLA)
-library(Matching)
 
-eur <- read.table("/net/akey/vol1/home/rcmccoy/ncbi/dbGaP-8037/files/eur.list", header = F)
-eur <- as.vector(eur[['V1']])
-
+# read ASE read count data
+dt <- fread("/net/akey/vol1/home/rcmccoy/neanderthal_ase/2015_12_15/data/GTEx_MidPoint_Imputation_ASE.expression-matrixfmt-ase.tsv", header = T, verbose = T)
+dt[, mergeID := paste(CHR, POS, sep = "_")]
+	
+# get list of high confidence Neandertal tag SNPs
 neand <- fread("/net/akey/vol1/home/rcmccoy/neanderthal_ase/2015_12_15/data/neand_tag_snps_EUR.filtered.txt") %>%
 	setnames(., c("mergeID", "CHR", "POS", "ANC", "DER", "AA_freq", "AFR_freq", "AMR_freq", "EAS_freq", "EUR_freq", "PNG_freq", "SAS_freq", "NEAND_BASE"))
-	
-sex <- fread("~/neanderthal_ase/2015_12_15/data/sex.txt") %>%
-	setnames(., c("SUBJECT_ID", "SEX"))
+dt[, neandIndicator := FALSE]
+dt[mergeID %in% neand$mergeID, neandIndicator := TRUE]
 
-dt <- fread("/net/akey/vol1/home/rcmccoy/neanderthal_ase/2015_12_15/data/GTEx_MidPoint_Imputation_ASE.expression-matrixfmt-ase.tsv", header = T, verbose = T) %>%
-   mutate(., mergeID = paste(CHR, POS, sep = "_"))
-
+# exclude extreme reference ratios
 dt <- dt[REF_RATIO >= 0.1 & REF_RATIO <= 0.9]
+
+# get sex of subjects
+sex <- fread("~/neanderthal_ase/2015_12_15/data/sex.txt") %>%
+  setnames(., c("SUBJECT_ID", "SEX"))
 dt <- merge(dt, sex, "SUBJECT_ID")
+
+# limit to European GTEx subjects
+eur <- read.table("/net/akey/vol1/home/rcmccoy/ncbi/dbGaP-8037/files/eur.list", header = F)
+eur <- as.vector(eur[['V1']])
 dt <- dt[SUBJECT_ID %in% eur]
 
-dt$neandIndicator <- FALSE
-dt[which(dt$mergeID %in% neand$mergeID)]$neandIndicator <- TRUE
-
 freq <- fread("/net/akey/vol1/home/rcmccoy/neanderthal_ase/2015_12_15/data/AF_biallelic.txt", sep = "\t") %>%
-	setnames(., c("CHROM", "POS", "REF", "ALT", "RSID", "ANCESTRAL", "GLOBAL_AF", "EAS_AF", "EUR_AF")) %>%
-	mutate(., mergeID = paste(CHROM, POS, sep = "_"))
-	
+  setnames(., c("CHROM", "POS", "REF", "ALT", "RSID", "ANCESTRAL", "GLOBAL_AF", "EAS_AF", "EUR_AF"))
+freq[, mergeID := paste(CHROM, POS, sep = "_")]
 freq <- freq[, CHROM := NULL]
 freq <- freq[, POS := NULL]
 
@@ -37,15 +38,15 @@ freq <- freq[, POS := NULL]
 dt <- merge(dt, freq, "mergeID")
 dt <- dt[ANCESTRAL %in% toupper(letters)]
 dt <- dt[REF == ANCESTRAL | ALT == ANCESTRAL]
-dt$DERIVED_COUNT <- as.integer(NA)
-dt[REF == ANCESTRAL]$DERIVED_COUNT <- dt[REF == ANCESTRAL]$ALT_COUNT
-dt[ALT == ANCESTRAL]$DERIVED_COUNT <- dt[ALT == ANCESTRAL]$REF_COUNT
+dt[, DERIVED_COUNT := as.integer(NA)]
+dt[REF == ANCESTRAL, DERIVED_COUNT := ALT_COUNT]
+dt[ALT == ANCESTRAL, DERIVED_COUNT := REF_COUNT]
 
 formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + TISSUE_ID
 m1 <- inla(formula, data = dt[neandIndicator == TRUE], family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
 
-dt$brainIndicator <- grepl("BRN", dt$TISSUE_ID)
-dt$testisIndicator <- grepl("TESTIS", dt$TISSUE_ID)
+dt[, brainIndicator := grepl("BRN", TISSUE_ID)]
+dt[, testisIndicator := grepl("TESTIS", TISSUE_ID)]
 
 formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + f(TISSUE_ID, model = "iid") + brainIndicator
 m2 <- inla(formula, data = dt[neandIndicator == TRUE], family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
