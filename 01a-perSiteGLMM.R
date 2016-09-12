@@ -1,5 +1,6 @@
 library(data.table)
 library(dtplyr)
+library(magrittr)
 library(parallel)
 library(boot)
 library(INLA)
