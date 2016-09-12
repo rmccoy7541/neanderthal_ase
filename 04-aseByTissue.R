@@ -66,7 +66,7 @@ n_samples[, TISSUE_ID := paste("TISSUE_ID", TISSUE_ID, sep = "")]
 get_coef <- function(model_results_list, iteration, n_samples) {
   model_results <- m_list[[iteration]]
   model_coefs <- data.table(TISSUE_ID = rownames(model_results$summary.fixed), model_results$summary.fixed, iteration = iteration)
-  model_coefs <- model_coefs[TISSUE_ID != "(Intercept)" & !(TISSUE_ID %in% n_samples[n < 10]$TISSUE_ID)] %>% setorder(., `0.995quant`)
+  model_coefs <- model_coefs[TISSUE_ID != "(Intercept)"] %>% setorder(., `0.995quant`)
   model_coefs[, tissue_order := .I]
   return(model_coefs)
 }
@@ -75,26 +75,25 @@ m_list_results <- do.call(rbind, lapply(1:5, function(x) get_coef(m_list, x, n_s
 m_list_results[, TISSUE_ID := gsub("TISSUE_ID", "", TISSUE_ID)]
 m_list_results[, color_factor := 1]
 m_list_results[grepl("BRN", TISSUE_ID), color_factor := 2]
-m_list_results[grepl(TISSUE_ID, "TESTIS"), color_factor := 3]
-
+m_list_results[grepl("TESTIS", TISSUE_ID), color_factor := 3]
 
 pdf("~/gg.pdf")
-ggplot(data = m_list_results, aes(x = TISSUE_ID, y = tissue_order)) + 
+ggplot(data = m_list_results, aes(x = TISSUE_ID, y = tissue_order, color = factor(color_factor))) + 
 	geom_point() +
 	theme_bw() +
 	theme(axis.text.x = element_text(angle = 90, hjust = 0), legend.position = "none") +
-	ylab("Order of upper confidence limit estimates") +
+	ylab("Order of Upper 99% Confidence Limit of Coefficient Estimate") +
 	xlab("Tissue") +
-	geom_hline(yintercept = 23.5, color = "red")
+	geom_hline(yintercept = 26.5, color = "red")
 dev.off()
+
+### test on covariate-matched non-introgressed controls ###
 
 dt[, brainIndicator := grepl("BRN", TISSUE_ID)]
 dt[, testisIndicator := grepl("TESTIS", TISSUE_ID)]
 
 formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + f(TISSUE_ID, model = "iid") + brainIndicator
 m2 <- inla(formula, data = dt[neandIndicator == TRUE], family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
-
-### test on covariate-matched non-introgressed controls ###
 
 match_features <- group_by(dt, mergeID) %>%
 	summarise(., neandIndicator = unique(neandIndicator), GENE_ID = unique(GENE_ID),
