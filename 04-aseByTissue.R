@@ -43,7 +43,44 @@ dt[REF == ANCESTRAL, DERIVED_COUNT := ALT_COUNT]
 dt[ALT == ANCESTRAL, DERIVED_COUNT := REF_COUNT]
 
 formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + TISSUE_ID
-m1 <- inla(formula, data = dt[neandIndicator == TRUE], family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
+m0 <- inla(formula, data = dt[neandIndicator == TRUE], family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
+m0_results <- data.table(TISSUE_ID = rownames(m0$summary.fixed), m0$summary.fixed) %>% setorder(., mean)
+m0_results[!(TISSUE_ID %in% n_samples[n < 10]$TISSUE_ID)]
+
+# assign data to K = 5 subsets by gene for cross-validation
+gene_list <- data.table(GENE_ID = unique(dt[neandIndicator == TRUE]$GENE_ID))
+gene_list <- gene_list[!is.na(GENE_ID)]
+set.seed(1)
+gene_list[, setID := sample(rep(1:5, length = nrow(gene_list)))]
+
+m_list <- lapply(1:5, function(x) inla(formula, data = dt[neandIndicator == TRUE & (GENE_ID %in% gene_list[setID == x]$GENE_ID)], 
+                                       family = "binomial", Ntrials = TOTAL_COUNT, 
+                                       quantile = c(0.005, 0.025, 0.975, 0.995)))
+
+get_coef <- function(model_results_list, iteration) {
+  model_results <- m_list[[iteration]]
+  model_coefs <- data.table(TISSUE_ID = rownames(model_results$summary.fixed), model_results$summary.fixed, iteration = iteration)
+  model_coefs <- model_coefs[TISSUE_ID != "(Intercept)"] %>% setorder(., mean)
+  model_coefs[, tissue_order := .I]
+  return(model_coefs)
+}
+
+m_list_results <- do.call(rbind, lapply(1:5, function(x) get_coef(m_list, x)))
+
+n_samples <- group_by(dt[neandIndicator == TRUE], TISSUE_ID) %>%
+  summarise(., n = length(unique(SAMPLE_ID))) %>%
+  setorder(., n)
+n_samples <- data.table(n_samples)
+n_samples[, TISSUE_ID := paste("TISSUE_ID", TISSUE_ID, sep = "")]
+
+limits <- aes(x = TISSUE_ID, ymin = `0.005quant`, ymax = `0.995quant`)
+ggplot(data = m_list_results, aes(x = TISSUE_ID, y = mean)) + 
+	geom_point(position_dodge(width = 1)) +
+	geom_errorbar(limits) +
+	theme_bw() +
+	theme(axis.text.x = element_text(angle = 90, hjust = 0), legend.position = "none") +
+	ylab("Prop. Reads Supporting Neand. Allele (99% CI)") +
+	xlab("Tissue")
 
 dt[, brainIndicator := grepl("BRN", TISSUE_ID)]
 dt[, testisIndicator := grepl("TESTIS", TISSUE_ID)]
