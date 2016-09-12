@@ -57,30 +57,36 @@ m_list <- lapply(1:5, function(x) inla(formula, data = dt[neandIndicator == TRUE
                                        family = "binomial", Ntrials = TOTAL_COUNT, 
                                        quantile = c(0.005, 0.025, 0.975, 0.995)))
 
-get_coef <- function(model_results_list, iteration) {
-  model_results <- m_list[[iteration]]
-  model_coefs <- data.table(TISSUE_ID = rownames(model_results$summary.fixed), model_results$summary.fixed, iteration = iteration)
-  model_coefs <- model_coefs[TISSUE_ID != "(Intercept)"] %>% setorder(., mean)
-  model_coefs[, tissue_order := .I]
-  return(model_coefs)
-}
-
-m_list_results <- do.call(rbind, lapply(1:5, function(x) get_coef(m_list, x)))
-
 n_samples <- group_by(dt[neandIndicator == TRUE], TISSUE_ID) %>%
   summarise(., n = length(unique(SAMPLE_ID))) %>%
   setorder(., n)
 n_samples <- data.table(n_samples)
 n_samples[, TISSUE_ID := paste("TISSUE_ID", TISSUE_ID, sep = "")]
 
-limits <- aes(x = TISSUE_ID, ymin = `0.005quant`, ymax = `0.995quant`)
-ggplot(data = m_list_results, aes(x = TISSUE_ID, y = mean)) + 
-	geom_point(position_dodge(width = 1)) +
-	geom_errorbar(limits) +
+get_coef <- function(model_results_list, iteration, n_samples) {
+  model_results <- m_list[[iteration]]
+  model_coefs <- data.table(TISSUE_ID = rownames(model_results$summary.fixed), model_results$summary.fixed, iteration = iteration)
+  model_coefs <- model_coefs[TISSUE_ID != "(Intercept)" & !(TISSUE_ID %in% n_samples[n < 10]$TISSUE_ID)] %>% setorder(., `0.995quant`)
+  model_coefs[, tissue_order := .I]
+  return(model_coefs)
+}
+
+m_list_results <- do.call(rbind, lapply(1:5, function(x) get_coef(m_list, x, n_samples)))
+m_list_results[, TISSUE_ID := gsub("TISSUE_ID", "", TISSUE_ID)]
+m_list_results[, color_factor := 1]
+m_list_results[grepl("BRN", TISSUE_ID), color_factor := 2]
+m_list_results[grepl(TISSUE_ID, "TESTIS"), color_factor := 3]
+
+
+pdf("~/gg.pdf")
+ggplot(data = m_list_results, aes(x = TISSUE_ID, y = tissue_order)) + 
+	geom_point() +
 	theme_bw() +
 	theme(axis.text.x = element_text(angle = 90, hjust = 0), legend.position = "none") +
-	ylab("Prop. Reads Supporting Neand. Allele (99% CI)") +
-	xlab("Tissue")
+	ylab("Order of upper confidence limit estimates") +
+	xlab("Tissue") +
+	geom_hline(yintercept = 23.5, color = "red")
+dev.off()
 
 dt[, brainIndicator := grepl("BRN", TISSUE_ID)]
 dt[, testisIndicator := grepl("TESTIS", TISSUE_ID)]
