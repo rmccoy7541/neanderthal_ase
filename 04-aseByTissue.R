@@ -11,7 +11,7 @@ dt[, mergeID := paste(CHR, POS, sep = "_")]
 	
 # get list of high confidence Neandertal tag SNPs
 neand <- fread("/net/akey/vol1/home/rcmccoy/neanderthal_ase/2015_12_15/data/neand_tag_snps_EUR.filtered.txt") %>%
-	setnames(., c("mergeID", "CHR", "POS", "ANC", "DER", "AA_freq", "AFR_freq", "AMR_freq", "EAS_freq", "EUR_freq", "PNG_freq", "SAS_freq", "NEAND_BASE"))
+  setnames(., c("mergeID", "CHR", "POS", "ANC", "DER", "AA_freq", "AFR_freq", "AMR_freq", "EAS_freq", "EUR_freq", "PNG_freq", "SAS_freq", "NEAND_BASE"))
 dt[, neandIndicator := FALSE]
 dt[mergeID %in% neand$mergeID, neandIndicator := TRUE]
 
@@ -79,12 +79,12 @@ m_list_results[grepl("TESTIS", TISSUE_ID), color_factor := 3]
 
 pdf("~/gg.pdf")
 ggplot(data = m_list_results, aes(x = TISSUE_ID, y = tissue_order, color = factor(color_factor))) + 
-	geom_point() +
-	theme_bw() +
-	theme(axis.text.x = element_text(angle = 90, hjust = 0), legend.position = "none") +
-	ylab("Order of Upper 99% Confidence Limit of Coefficient Estimate") +
-	xlab("Tissue") +
-	geom_hline(yintercept = 26.5, color = "red")
+  geom_point() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0), legend.position = "none") +
+  ylab("Order of Upper 99% Confidence Limit of Coefficient Estimate") +
+  xlab("Tissue") +
+  geom_hline(yintercept = 26.5, color = "red")
 dev.off()
 
 ### test on covariate-matched non-introgressed controls ###
@@ -93,45 +93,40 @@ dt[, brainIndicator := grepl("BRN", TISSUE_ID)]
 dt[, testisIndicator := grepl("TESTIS", TISSUE_ID)]
 
 formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + f(TISSUE_ID, model = "iid") + brainIndicator
-m2 <- inla(formula, data = dt[neandIndicator == TRUE], family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
+m1 <- inla(formula, data = dt[neandIndicator == TRUE], family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
 
 match_features <- group_by(dt, mergeID) %>%
-	summarise(., neandIndicator = unique(neandIndicator), GENE_ID = unique(GENE_ID),
-		  n_subjects = length(unique(SUBJECT_ID)), n_tissues = length(unique(TISSUE_ID)))
+  summarise(., neandIndicator = unique(neandIndicator), GENE_ID = unique(GENE_ID),
+               n_subjects = length(unique(SUBJECT_ID)), n_tissues = length(unique(TISSUE_ID)))
 
 post_p <- function(model) {
-	m <- model$marginals.fixed[[2]]
-	lower_p <- inla.pmarginal(0, m)
-	upper_p <- 1 - inla.pmarginal(0, m)
-	post_pred_p <- 2 * (min(lower_p, upper_p))
-	return(post_pred_p)
+  m <- model$marginals.fixed[[2]]
+  lower_p <- inla.pmarginal(0, m)
+  upper_p <- 1 - inla.pmarginal(0, m)
+  post_pred_p <- 2 * (min(lower_p, upper_p))
+  return(post_pred_p)
 }
 
 control_regression_brain <- function(match_features, dt) {
-	neand <- match_features[neandIndicator == T][sample(nrow(match_features[neandIndicator == T]))][!duplicated(GENE_ID)]
-	cntrl <- match_features[neandIndicator == F][sample(nrow(match_features[neandIndicator == F]))][!duplicated(GENE_ID)]
-	match_features_indep <- rbind(neand, cntrl)
-	matches <- Match(Tr = match_features_indep$neandIndicator, X = match_features_indep[, 4:5, with = F], replace = FALSE)
-	obs_snps <- match_features_indep[matches$index.treated,]$mergeID
-	control_snps <- match_features_indep[matches$index.control,]$mergeID	
-	r_subject <- cor.test(match_features_indep[matches$index.treated,]$n_subjects, match_features_indep[matches$index.control,]$n_subjects)$estimate
-	r_tissue <- cor.test(match_features_indep[matches$index.treated,]$n_tissues, match_features_indep[matches$index.control,]$n_tissues)$estimate
-	formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + f(TISSUE_ID, model = "iid") + brainIndicator
-	m_neand <- inla(formula, data = dt[mergeID %in% obs_snps], family = "binomial", Ntrials = TOTAL_COUNT)
-	m_cntrl <- inla(formula, data = dt[mergeID %in% control_snps], family = "binomial", Ntrials = TOTAL_COUNT)
-	mean_n <- m_neand$summary.fixed[["mean"]][2]
-	mean_c <- m_cntrl$summary.fixed[["mean"]][2]
-	sd_n <- m_neand$summary.fixed[["sd"]][2]
-	sd_c <- m_cntrl$summary.fixed[["sd"]][2]
-	p_n <- post_p(m_neand)
-	p_c <- post_p(m_cntrl)
-	results <- data.table(r_subject = r_subject, r_tissue = r_tissue, mean_n = mean_n, mean_c = mean_c,
-        		      sd_n = sd_n, sd_c = sd_c, p_n = p_n, p_c = p_c)
-	write.table(results, "~/brain_control.txt", quote = F, row.names = F, col.names = F, append = T)
-	return(results)
+  neand <- match_features[neandIndicator == T][sample(nrow(match_features[neandIndicator == T]))][!duplicated(GENE_ID) | is.na(GENE_ID)]
+  cntrl <- match_features[neandIndicator == F][sample(nrow(match_features[neandIndicator == F]))][!duplicated(GENE_ID) | is.na(GENE_ID)]
+  match_features_indep <- rbind(neand, cntrl)
+  matches <- Match(Tr = match_features_indep$neandIndicator, X = match_features_indep[, 4:5, with = F], replace = FALSE)
+  obs_snps <- match_features_indep[matches$index.treated]$mergeID
+  control_snps <- match_features_indep[matches$index.control]$mergeID	
+  r_subject <- cor.test(match_features_indep[matches$index.treated,]$n_subjects, match_features_indep[matches$index.control,]$n_subjects)$estimate
+  r_tissue <- cor.test(match_features_indep[matches$index.treated,]$n_tissues, match_features_indep[matches$index.control,]$n_tissues)$estimate
+  formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + f(TISSUE_ID, model = "iid") + brainIndicator * neandIndicator
+  m <- inla(formula, data = dt[mergeID %in% obs_snps | mergeID %in% control_snps], family = "binomial", Ntrials = TOTAL_COUNT)
+  mean_coef <- m$summary.fixed[["mean"]][2]
+  sd <- m$summary.fixed[["sd"]][2]
+  p <- post_p(m)
+  results <- data.table(r_subject = r_subject, r_tissue = r_tissue, mean = mean_coef, sd = sd, p = p)
+  write.table(results, "~/brain_control.txt", quote = F, row.names = F, col.names = F, append = T)
+  return(results)
 }
 
-set.seed(123)
+set.seed(1)
 control_brain <- do.call(rbind, lapply(1:1000, function(x) control_regression_brain(match_features, dt)))
 
 ### plot ASE by tissue ###
