@@ -108,26 +108,41 @@ post_p <- function(model) {
 }
 
 control_regression_brain <- function(match_features, dt) {
-  neand <- match_features[neandIndicator == T][sample(nrow(match_features[neandIndicator == T]))][!duplicated(GENE_ID) | is.na(GENE_ID)]
-  cntrl <- match_features[neandIndicator == F][sample(nrow(match_features[neandIndicator == F]))][!duplicated(GENE_ID) | is.na(GENE_ID)]
+  # for nonintrogressed snps, sample n genes such that matched set will have ~same total number of genes (2006) as introgressed set
+  genes <- unique(dt[neandIndicator == F]$GENE_ID)
+  gene_sample <- sample(genes, 4600)
+  na_snps <- sample(unique(dt[neandIndicator == F & is.na(GENE_ID)]$mergeID), 16000) # get approximately the same proportion of non-genic SNPs
+  dt_mod <- rbind(dt[neandIndicator == T], dt[neandIndicator == F & (GENE_ID %in% gene_sample | mergeID %in% na_snps)])
+  neand <- match_features[mergeID %in% dt_mod[neandIndicator == T]$mergeID]
+  cntrl <- match_features[mergeID %in% dt_mod[neandIndicator == F]$mergeID]
   match_features_indep <- rbind(neand, cntrl)
   matches <- Match(Tr = match_features_indep$neandIndicator, X = match_features_indep[, 4:5, with = F], replace = FALSE)
   obs_snps <- match_features_indep[matches$index.treated]$mergeID
   control_snps <- match_features_indep[matches$index.control]$mergeID	
   r_subject <- cor.test(match_features_indep[matches$index.treated,]$n_subjects, match_features_indep[matches$index.control,]$n_subjects)$estimate
   r_tissue <- cor.test(match_features_indep[matches$index.treated,]$n_tissues, match_features_indep[matches$index.control,]$n_tissues)$estimate
-  formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + f(TISSUE_ID, model = "iid") + brainIndicator * neandIndicator
-  m <- inla(formula, data = dt[mergeID %in% obs_snps | mergeID %in% control_snps], family = "binomial", Ntrials = TOTAL_COUNT)
+  formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + f(TISSUE_ID, model = "iid") + brainIndicator
+  # length(unique(dt_mod[mergeID %in% obs_snps]$GENE_ID))
+  n1 <- length(unique(dt_mod[mergeID %in% control_snps]$GENE_ID))
+  # length(unique(dt_mod[mergeID %in% obs_snps & !is.na(GENE_ID)]$mergeID))
+  n2 <- length(unique(dt_mod[mergeID %in% control_snps & !is.na(GENE_ID)]$mergeID))
+  # length(unique(dt_mod[mergeID %in% obs_snps & is.na(GENE_ID)]$mergeID))
+  n3 <- length(unique(dt_mod[mergeID %in% control_snps & is.na(GENE_ID)]$mergeID))
+  m <- inla(formula, data = dt_mod[mergeID %in% control_snps], family = "binomial", Ntrials = TOTAL_COUNT)
   mean_coef <- m$summary.fixed[["mean"]][2]
   sd <- m$summary.fixed[["sd"]][2]
   p <- post_p(m)
-  results <- data.table(r_subject = r_subject, r_tissue = r_tissue, mean = mean_coef, sd = sd, p = p)
+  results <- data.table(r_subject = r_subject, r_tissue = r_tissue, 
+                        n1 = n1, n2 = n2, n3 = n3,
+                        mean = mean_coef, sd = sd, p = p)
   write.table(results, "~/brain_control.txt", quote = F, row.names = F, col.names = F, append = T)
   return(results)
 }
 
 set.seed(1)
-control_brain <- do.call(rbind, lapply(1:1000, function(x) control_regression_brain(match_features, dt)))
+control_brain <- do.call(rbind, lapply(1:10000, function(x) control_regression_brain(match_features, dt)))
+
+# then compare m1 results to the distribution of control results
 
 ### plot ASE by tissue ###
 
