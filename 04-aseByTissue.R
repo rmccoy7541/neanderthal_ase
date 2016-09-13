@@ -4,6 +4,8 @@ library(magrittr)
 library(parallel)
 library(boot)
 library(INLA)
+library(dplyr)
+library(Matching)
 
 # read ASE read count data
 dt <- fread("/net/akey/vol1/home/rcmccoy/neanderthal_ase/2015_12_15/data/GTEx_MidPoint_Imputation_ASE.expression-matrixfmt-ase.tsv", header = T, verbose = T)
@@ -107,11 +109,11 @@ post_p <- function(model) {
   return(post_pred_p)
 }
 
-control_regression_brain <- function(match_features, dt) {
+control_regression_brain <- function(match_features, dt, outfile) {
   # for nonintrogressed snps, sample n genes such that matched set will have ~same total number of genes (2006) as introgressed set
   genes <- unique(dt[neandIndicator == F]$GENE_ID)
-  gene_sample <- sample(genes, 4600)
-  na_snps <- sample(unique(dt[neandIndicator == F & is.na(GENE_ID)]$mergeID), 16000) # get approximately the same proportion of non-genic SNPs
+  gene_sample <- sample(genes, 4750)
+  na_snps <- sample(unique(dt[neandIndicator == F & is.na(GENE_ID)]$mergeID), 15000) # get approximately the same proportion of non-genic SNPs
   dt_mod <- rbind(dt[neandIndicator == T], dt[neandIndicator == F & (GENE_ID %in% gene_sample | mergeID %in% na_snps)])
   neand <- match_features[mergeID %in% dt_mod[neandIndicator == T]$mergeID]
   cntrl <- match_features[mergeID %in% dt_mod[neandIndicator == F]$mergeID]
@@ -135,14 +137,21 @@ control_regression_brain <- function(match_features, dt) {
   results <- data.table(r_subject = r_subject, r_tissue = r_tissue, 
                         n1 = n1, n2 = n2, n3 = n3,
                         mean = mean_coef, sd = sd, p = p)
-  write.table(results, "~/brain_control.txt", quote = F, row.names = F, col.names = F, append = T)
+  write.table(results, outfile, quote = F, row.names = F, col.names = F, append = T)
   return(results)
 }
 
 set.seed(1)
-control_brain <- do.call(rbind, lapply(1:10000, function(x) control_regression_brain(match_features, dt)))
+control_brain <- do.call(rbind, lapply(1:1000, function(x) control_regression_brain(match_features, dt, "~/cntrl_brain_1.txt")))
+
+set.seed(2)
+control_brain <- do.call(rbind, lapply(1:1000, function(x) control_regression_brain(match_features, dt, "~/cntrl_brain_2.txt")))
+
+set.seed(3)
+control_brain <- do.call(rbind, lapply(1:1000, function(x) control_regression_brain(match_features, dt, "~/cntrl_brain_3.txt")))
 
 # then compare m1 results to the distribution of control results
+# use http://artax.karlin.mff.cuni.cz/r-help/library/fExtremes/html/GpdDistribution.html ?
 
 ### plot ASE by tissue ###
 
