@@ -1,24 +1,24 @@
 library(data.table)
 library(ggplot2)
-library(dtplyr)
 library(boot)
+library(dplyr)
 
 tissue_list <- read.table("~/Desktop/ASE/tissues/tissueList.txt", stringsAsFactors = F)$V1
 
 read_tissue <- function(tissue_name) {
 	filename <- paste("~/Desktop/ASE/tissues/ASE_results_inla_introgressed_", tissue_name, ".txt", sep = "")
 	dt <- fread(filename) %>%
-		setnames(., c("CHROM", "POS", "mergeID", "EST", "CI0.025", "CI0.975")) %>%
-		mutate(., TISSUE = tissue_name)
+		setnames(., c("CHROM", "POS", "mergeID", "EST", "CI0.025", "CI0.975"))
+	dt[, TISSUE := tissue_name]
 	return(dt)
 }
 
-ase_results <- do.call(rbind, lapply(tissue_list, function(x) read_tissue(x))) %>%
-	mutate(., brain_indicator = grepl("BRN", TISSUE))
+ase_results <- do.call(rbind, lapply(tissue_list, function(x) read_tissue(x)))
+ase_results[, brain_indicator := grepl("BRN", TISSUE)]
 
 freq <- fread("~/Desktop/ASE/AF_biallelic.txt", sep = "\t") %>%
-	setnames(., c("CHROM", "POS", "REF", "ALT", "RSID", "ANCESTRAL", "GLOBAL_AF", "EAS_AF", "EUR_AF")) %>%
-	mutate(., mergeID = paste(CHROM, POS, sep = "_"))
+	setnames(., c("CHROM", "POS", "REF", "ALT", "RSID", "ANCESTRAL", "GLOBAL_AF", "EAS_AF", "EUR_AF"))
+freq[, mergeID := paste(CHROM, POS, sep = "_")]
 freq <- freq[, CHROM := NULL]
 freq <- freq[, POS := NULL]
 
