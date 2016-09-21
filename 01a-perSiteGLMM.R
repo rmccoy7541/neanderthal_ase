@@ -1,7 +1,7 @@
 library(data.table)
-library(dtplyr)
 library(magrittr)
 library(parallel)
+library(dplyr)
 library(boot)
 library(INLA)
 
@@ -11,7 +11,7 @@ dt[, mergeID := paste(CHR, POS, sep = "_")]
 	
 # get list of high confidence Neandertal tag SNPs
 neand <- fread("/net/akey/vol1/home/rcmccoy/neanderthal_ase/2015_12_15/data/neand_tag_snps_EUR.filtered.txt") %>%
-	setnames(., c("mergeID", "CHR", "POS", "ANC", "DER", "AA_freq", "AFR_freq", "AMR_freq", "EAS_freq", "EUR_freq", "PNG_freq", "SAS_freq", "NEAND_BASE"))
+  setnames(., c("mergeID", "CHR", "POS", "ANC", "DER", "AA_freq", "AFR_freq", "AMR_freq", "EAS_freq", "EUR_freq", "PNG_freq", "SAS_freq", "NEAND_BASE"))
 dt[, neandIndicator := FALSE]
 dt[mergeID %in% neand$mergeID, neandIndicator := TRUE]
 
@@ -29,19 +29,19 @@ eur <- as.vector(eur[['V1']])
 dt <- dt[SUBJECT_ID %in% eur]
 
 
-### compute ASE per SNP, separately considering introgressed tag SNPs and non-tag SNPs ###
+### compute ASE per SNP, separately considering introgressed tag SNPs and non-introgressed SNPs ###
 
 fixed_effect_model <- function(snp, dt) {
-	chrom <- unique(dt[mergeID == snp]$CHR[1])
-	pos <- unique(dt[mergeID == snp]$POS[1])
-	gene <- unique(dt[mergeID == snp]$GENE_ID)
-	m1 <- glm(data = dt[mergeID == snp], formula = cbind(ALT_COUNT, REF_COUNT) ~ 1, family = binomial)
-	ci95 <- unname(suppressMessages(confint(m1, level = 0.95)))
-	ci99 <- unname(suppressMessages(confint(m1, level = 0.99)))
-	coef <- summary(m1)$coefficients
-	ctab <- data.table(chrom = chrom, pos = pos, snpid = snp, geneid = gene, est = coef[1], 
-	                   ci0.005 = ci99[1], ci0.025 = ci95[1], ci0.975 = ci95[2], ci0.995 = ci99[2], 
-	                   p = coef[4])
+  chrom <- unique(dt[mergeID == snp]$CHR[1])
+  pos <- unique(dt[mergeID == snp]$POS[1])
+  gene <- unique(dt[mergeID == snp]$GENE_ID)
+  m1 <- glm(data = dt[mergeID == snp], formula = cbind(ALT_COUNT, REF_COUNT) ~ 1, family = binomial)
+  ci95 <- unname(suppressMessages(confint(m1, level = 0.95)))
+  ci99 <- unname(suppressMessages(confint(m1, level = 0.99)))
+  coef <- summary(m1)$coefficients
+  ctab <- data.table(chrom = chrom, pos = pos, snpid = snp, geneid = gene, est = coef[1], 
+	           	       ci0.005 = ci99[1], ci0.025 = ci95[1], ci0.975 = ci95[2], ci0.995 = ci99[2], 
+	           	       p = coef[4])
 	return(ctab)
 }
 
@@ -97,14 +97,11 @@ glmer_ase <- function(snp, dt, null) {
 
 null <- logit(median(1 - dt$REF_RATIO))
 
-p_table_introgressed <- do.call(rbind, 
-                                mclapply(unique(dt[neandIndicator == T]$mergeID), 
-                                         function(x) glmer_ase(x, dt, null), mc.cores = 12))
+p_table_introgressed <- do.call(rbind, mclapply(unique(dt[neandIndicator == T]$mergeID), 
+	                   	          function(x) glmer_ase(x, dt, null), mc.cores = 12))
 
-p_table_nonintrogressed <- do.call(rbind, 
-                                   mclapply(unique(dt[neandIndicator == F]$mergeID), 
-					                                  function(x) glmer_ase(x, dt, null), 
-					                                  mc.cores = 12))
+p_table_nonintrogressed <- do.call(rbind, mclapply(unique(dt[neandIndicator == F]$mergeID), 
+	                   	             function(x) glmer_ase(x, dt, null), mc.cores = 12))
 
 ### Benjamini–Hochberg procedure for controlling FDR ###
 
@@ -112,8 +109,7 @@ bh_fdr <- function(p_table, fdr) {
 	setorder(p_table, p)
 	p_table$rank <- 1:nrow(p_table)
 	m <- nrow(p_table)
-	p_table <- p_table %>%
-		mutate(., bh_crit = (rank / m) * fdr)
+	p_table[, bh_crit := (rank / m) * fdr]
 	max_rank <- max(p_table[p < bh_crit]$rank)
 	p_table$sig <- FALSE
 	p_table[rank <= max_rank]$sig <- TRUE
@@ -139,14 +135,14 @@ write.table(p_table_0.1, "~/p_table.txt", quote = F, row.names = F, col.names = 
 ### get ancestral allele states ###
 
 freq <- fread("/net/akey/vol1/home/rcmccoy/neanderthal_ase/2015_12_15/data/AF_biallelic.txt", sep = "\t") %>%
-	setnames(., c("CHROM", "POS", "REF", "ALT", "RSID", "ANCESTRAL", "GLOBAL_AF", "EAS_AF", "EUR_AF")) %>%
-	mutate(., snpid = paste(CHROM, POS, sep = "_"))
-
+	setnames(., c("CHROM", "POS", "REF", "ALT", "RSID", "ANCESTRAL", "GLOBAL_AF", "EAS_AF", "EUR_AF"))
+freq[, snpid := paste(CHROM, POS, sep = "_")]
 freq <- freq[, CHROM := NULL]
 freq <- freq[, POS := NULL]
 
 ase_results <- merge(p_table_0.1, freq, "snpid")
 # remove ambiguous and low confidence ancestral allele calls
+# http://www.1000genomes.org/faq/where-does-ancestral-allele-information-your-variants-come/
 ase_results <- ase_results[ANCESTRAL %in% toupper(letters)]
 ase_results <- ase_results[REF == ANCESTRAL | ALT == ANCESTRAL]
 
