@@ -9,7 +9,9 @@ Descriptions of analysis scripts
 
 <code>03-sigByDAF.R</code>: Compare the proportion of introgressed and nonintrogressed SNPs showing significant ASE, stratifying by derived allele frequency to control for power. [**Fig. 1b**, **Fig. 3a**, **Fig. 3b**]
 
-<code>04-aseByTissue.R</code>: Fit a GLMM to the full introgressed dataset (rather than per-SNP) with tissue as a fixed effect. Compare the coefficient estimates for different tissues. [**Fig. 4a**]
+<code>04a-aseByTissue.R</code>: Fit a GLMM to the full introgressed dataset (rather than per-SNP) with tissue as a fixed effect. Compare the coefficient estimates for different tissues. [**Fig. 4a**]
+
+<code>04b-aseByTissue_matched_control.R</code>: Fit the same model to equal-sized samples of covariate-matched non-introgressed control SNPs to further evaluate signficance of downregulation of Neanderthal alleles.
 
 <code>05_sigByTissue.R</code>: Compare proportions of up- and down-regulated SNPs per tissue. [**Fig. 4b**]
 
