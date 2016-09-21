@@ -7,13 +7,13 @@ Descriptions of analysis scripts
 
 <code>02-getDerivedAF.sh</code>: Extract the ancestral/derived allele calls from the 1000 genomes dataset.
 
-<code>03-sigByDAF.R</code>: Compare the proportion of introgressed and nonintrogressed SNPs showing significant ASE, stratifying by derived allele frequency to control for power. [Fig. 1b, Fig. 3a, Fig. 3b]
+<code>03-sigByDAF.R</code>: Compare the proportion of introgressed and nonintrogressed SNPs showing significant ASE, stratifying by derived allele frequency to control for power. [**Fig. 1b**, **Fig. 3a**, **Fig. 3b**]
 
-<code>04-aseByTissue.R</code>: Fit a GLMM to the full introgressed dataset (rather than per-SNP) with tissue as a fixed effect. Compare the coefficient estimates for different tissues. [Fig. 4a]
+<code>04-aseByTissue.R</code>: Fit a GLMM to the full introgressed dataset (rather than per-SNP) with tissue as a fixed effect. Compare the coefficient estimates for different tissues. [**Fig. 4a**]
 
-<code>05_sigByTissue.R</code>: Compare proportions of up- and down-regulated SNPs per tissue. [Fig. 4b]
+<code>05_sigByTissue.R</code>: Compare proportions of up- and down-regulated SNPs per tissue. [**Fig. 4b**]
 
-<code>06_divergenceByTissue.R</code>: Get the expression-weighted divergence between modern human and Neanderthal gene sequences per tissue. [Fig. 4c]
+<code>06_divergenceByTissue.R</code>: Get the expression-weighted divergence between modern human and Neanderthal gene sequences per tissue. [**Fig. 4c**]
 
 
 Links to data sources
