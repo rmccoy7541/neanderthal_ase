@@ -1,5 +1,4 @@
 library(data.table)
-library(dtplyr)
 library(magrittr)
 library(parallel)
 library(boot)
@@ -44,50 +43,9 @@ dt[, DERIVED_COUNT := as.integer(NA)]
 dt[REF == ANCESTRAL, DERIVED_COUNT := ALT_COUNT]
 dt[ALT == ANCESTRAL, DERIVED_COUNT := REF_COUNT]
 
-formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + TISSUE_ID
+formula = DERIVED_COUNT ~ -1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + TISSUE_ID
 m0 <- inla(formula, data = dt[neandIndicator == TRUE], family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
-m0_results <- data.table(TISSUE_ID = rownames(m0$summary.fixed), m0$summary.fixed) %>% setorder(., mean)
-m0_results[!(TISSUE_ID %in% n_samples[n < 10]$TISSUE_ID)]
-
-# assign data to K = 5 subsets by gene for cross-validation
-gene_list <- data.table(GENE_ID = unique(dt[neandIndicator == TRUE]$GENE_ID))
-gene_list <- gene_list[!is.na(GENE_ID)]
-set.seed(1)
-gene_list[, setID := sample(rep(1:5, length = nrow(gene_list)))]
-
-m_list <- lapply(1:5, function(x) inla(formula, data = dt[neandIndicator == TRUE & (GENE_ID %in% gene_list[setID == x]$GENE_ID)], 
-                                       family = "binomial", Ntrials = TOTAL_COUNT, 
-                                       quantile = c(0.005, 0.025, 0.975, 0.995)))
-
-n_samples <- group_by(dt[neandIndicator == TRUE], TISSUE_ID) %>%
-  summarise(., n = length(unique(SAMPLE_ID))) %>%
-  setorder(., n)
-n_samples <- data.table(n_samples)
-n_samples[, TISSUE_ID := paste("TISSUE_ID", TISSUE_ID, sep = "")]
-
-get_coef <- function(model_results_list, iteration, n_samples) {
-  model_results <- m_list[[iteration]]
-  model_coefs <- data.table(TISSUE_ID = rownames(model_results$summary.fixed), model_results$summary.fixed, iteration = iteration)
-  model_coefs <- model_coefs[TISSUE_ID != "(Intercept)"] %>% setorder(., `0.995quant`)
-  model_coefs[, tissue_order := .I]
-  return(model_coefs)
-}
-
-m_list_results <- do.call(rbind, lapply(1:5, function(x) get_coef(m_list, x, n_samples)))
-m_list_results[, TISSUE_ID := gsub("TISSUE_ID", "", TISSUE_ID)]
-m_list_results[, color_factor := 1]
-m_list_results[grepl("BRN", TISSUE_ID), color_factor := 2]
-m_list_results[grepl("TESTIS", TISSUE_ID), color_factor := 3]
-
-pdf("~/gg.pdf")
-ggplot(data = m_list_results, aes(x = TISSUE_ID, y = tissue_order, color = factor(color_factor))) + 
-  geom_point() +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 0), legend.position = "none") +
-  ylab("Order of Upper 99% Confidence Limit of Coefficient Estimate") +
-  xlab("Tissue") +
-  geom_hline(yintercept = 26.5, color = "red")
-dev.off()
+m0_results <- data.table(TISSUE_ID = rownames(m0$summary.fixed), m0$summary.fixed)
 
 ### test on covariate-matched non-introgressed controls ###
 
@@ -97,9 +55,13 @@ dt[, testisIndicator := grepl("TESTIS", TISSUE_ID)]
 formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + f(TISSUE_ID, model = "iid") + brainIndicator
 m1 <- inla(formula, data = dt[neandIndicator == TRUE], family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
 
+formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + f(TISSUE_ID, model = "iid") + testisIndicator
+m2 <- inla(formula, data = dt[neandIndicator == TRUE], family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
+
 match_features <- group_by(dt, mergeID) %>%
   summarise(., neandIndicator = unique(neandIndicator), GENE_ID = unique(GENE_ID),
-               n_subjects = length(unique(SUBJECT_ID)), n_tissues = length(unique(TISSUE_ID)))
+            n_subjects = length(unique(SUBJECT_ID)), n_tissues = length(unique(TISSUE_ID)))
+match_features <- data.table(match_features)
 
 post_p <- function(model) {
   m <- model$marginals.fixed[[2]]
@@ -110,10 +72,10 @@ post_p <- function(model) {
 }
 
 control_regression_brain <- function(match_features, dt, outfile) {
-  # for nonintrogressed snps, sample n genes such that matched set will have ~same total number of genes (2006) as introgressed set
+  # for nonintrogressed snps, sample n = 4750 genes such that matched set will have ~same total number of genes (2006) as introgressed set
   genes <- unique(dt[neandIndicator == F]$GENE_ID)
   gene_sample <- sample(genes, 4750)
-  na_snps <- sample(unique(dt[neandIndicator == F & is.na(GENE_ID)]$mergeID), 15000) # get approximately the same proportion of non-genic SNPs
+  na_snps <- sample(unique(dt[neandIndicator == F & is.na(GENE_ID)]$mergeID), 15000) # get approximately the same proportion of non-genic (NA) SNPs
   dt_mod <- rbind(dt[neandIndicator == T], dt[neandIndicator == F & (GENE_ID %in% gene_sample | mergeID %in% na_snps)])
   neand <- match_features[mergeID %in% dt_mod[neandIndicator == T]$mergeID]
   cntrl <- match_features[mergeID %in% dt_mod[neandIndicator == F]$mergeID]
@@ -124,11 +86,8 @@ control_regression_brain <- function(match_features, dt, outfile) {
   r_subject <- cor.test(match_features_indep[matches$index.treated,]$n_subjects, match_features_indep[matches$index.control,]$n_subjects)$estimate
   r_tissue <- cor.test(match_features_indep[matches$index.treated,]$n_tissues, match_features_indep[matches$index.control,]$n_tissues)$estimate
   formula = DERIVED_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + f(TISSUE_ID, model = "iid") + brainIndicator
-  # length(unique(dt_mod[mergeID %in% obs_snps]$GENE_ID))
   n1 <- length(unique(dt_mod[mergeID %in% control_snps]$GENE_ID))
-  # length(unique(dt_mod[mergeID %in% obs_snps & !is.na(GENE_ID)]$mergeID))
   n2 <- length(unique(dt_mod[mergeID %in% control_snps & !is.na(GENE_ID)]$mergeID))
-  # length(unique(dt_mod[mergeID %in% obs_snps & is.na(GENE_ID)]$mergeID))
   n3 <- length(unique(dt_mod[mergeID %in% control_snps & is.na(GENE_ID)]$mergeID))
   m <- inla(formula, data = dt_mod[mergeID %in% control_snps], family = "binomial", Ntrials = TOTAL_COUNT)
   mean_coef <- m$summary.fixed[["mean"]][2]
@@ -141,17 +100,9 @@ control_regression_brain <- function(match_features, dt, outfile) {
   return(results)
 }
 
+# use a wrapper script to parallelize this step
 set.seed(1)
 control_brain <- do.call(rbind, lapply(1:1000, function(x) control_regression_brain(match_features, dt, "~/cntrl_brain_1.txt")))
-
-set.seed(2)
-control_brain <- do.call(rbind, lapply(1:1000, function(x) control_regression_brain(match_features, dt, "~/cntrl_brain_2.txt")))
-
-set.seed(3)
-control_brain <- do.call(rbind, lapply(1:1000, function(x) control_regression_brain(match_features, dt, "~/cntrl_brain_3.txt")))
-
-# then compare m1 results to the distribution of control results
-# use http://artax.karlin.mff.cuni.cz/r-help/library/fExtremes/html/GpdDistribution.html ?
 
 ### plot ASE by tissue ###
 
@@ -159,30 +110,19 @@ nSamples <- group_by(dt[neandIndicator == TRUE], TISSUE_ID) %>%
 	summarise(., length(unique(SAMPLE_ID))) %>%
 	setnames(., c("TISSUE_ID", "nSamples")) %>%
 	setorder(., nSamples)
+nSamples <- data.table(nSamples)
 
-byTissue <- data.table(cbind(rownames(m1$summary.fixed), m1$summary.fixed)) %>%
-	setnames(., c("TISSUE_ID", "mean", "sd", "quant0.005", "quant0.025", "quant0.975", "quant0.995", "mode", "kld")) %>%
-	mutate(., TISSUE_ID = gsub("TISSUE_ID", "", TISSUE_ID))
+m0_results[, TISSUE_ID := gsub("TISSUE_ID", "", TISSUE_ID)]
 
-byTissue[1, 1] <- "ADPSBQ"
-refMean <- byTissue[TISSUE_ID == "ADPSBQ"]$mean
-byTissue[-1,]$mean <- byTissue[-1,]$mean + refMean
-byTissue[-1,]$quant0.005 <- byTissue[-1,]$quant0.005 + refMean
-byTissue[-1,]$quant0.025 <- byTissue[-1,]$quant0.025 + refMean
-byTissue[-1,]$quant0.975 <- byTissue[-1,]$quant0.975 + refMean
-byTissue[-1,]$quant0.995 <- byTissue[-1,]$quant0.995 + refMean
-
-# require at least 10 samples per tissue
-byTissue <- byTissue[TISSUE_ID %in% nSamples[nSamples >= 10]$TISSUE_ID]
-
-byTissue$brainIndicator <- FALSE
-byTissue[grepl("BRN", TISSUE_ID),]$brainIndicator <- TRUE
-
-byTissue$TISSUE_ID <- factor(byTissue$TISSUE_ID, levels = byTissue$TISSUE_ID[order(byTissue$mean)])
+# require at least 10 samples per tissue for plotting
+m0_results <- m0_results[TISSUE_ID %in% nSamples[nSamples >= 10]$TISSUE_ID]
+m0_results[, brainIndicator := grepl("BRN", TISSUE_ID)]
+m0_results$TISSUE_ID <- factor(m0_results$TISSUE_ID, levels = m0_results$TISSUE_ID[order(m0_results$mean)])
 
 limits <- aes(x = TISSUE_ID, ymin = exp(quant0.005) / (1 + exp(quant0.005)), ymax = exp(quant0.995) / (1 + exp(quant0.995)))
 limits2 <- aes(x = TISSUE_ID, ymin = exp(quant0.025) / (1 + exp(quant0.025)), ymax = exp(quant0.975) / (1 + exp(quant0.975)))
-ggplot(data = byTissue, aes(x = TISSUE_ID, y = exp(mean) / (1 + exp(mean)), color = factor(brainIndicator))) + 
+# generate Fig. 4a
+ggplot(data = m0_results, aes(x = TISSUE_ID, y = inv.logit(mean), color = factor(brainIndicator))) +
 	geom_point() +
 	geom_errorbar(limits) +
 	theme_bw() +
