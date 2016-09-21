@@ -1,7 +1,7 @@
 Descriptions of analysis scripts
 ---------------------
 
-<code>01a-perSiteGLMM.R</code>: For each SNP (introgressed or nonintrogressed), fit a generalized linear mixed model to estimate the allelic effect.
+<code>01a-perSiteGLMM.R</code>: For each SNP (introgressed or nonintrogressed), fit a generalized linear mixed model to estimate the allelic effect. Then determine significance at 10% FDR.
 
 <code>01b-perSiteGLMM_tissue_heterogeneity.R</code>: For each SNP, fit a GLMM with and without a fixed effect of tissue. Calculate the Bayes factor to compare the two models.
 
