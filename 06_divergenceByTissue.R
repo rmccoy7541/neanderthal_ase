@@ -160,6 +160,7 @@ missense_summary <- rbind(data.table(tissue = "Brain", mean_missense_div(grepl("
                           data.table(tissue = "All Tissues", mean_missense_div(tissues, missense_div_per_gene, gtex)),
                           data.table(tissue = "All Other Tissues", mean_missense_div(tissues[!grepl("BRN|TESTIS", tissues)], missense_div_per_gene, gtex)))
 limits <- aes(x = tissue, ymin = ll, ymax = ul)
+# generate Fig. 4c
 ggplot(data = missense_summary[!grepl("All", tissue)], aes(x = tissue, y = wmean)) +
 	geom_bar(stat = "identity") +
 	geom_errorbar(limits, position = "identity", width = 0.2 ) +
