@@ -1,11 +1,13 @@
 library(data.table)
+library(magrittr)
+library(dplyr)
+library(boot)
 library(ggplot2)
-library(dtplyr)
 
 # start with p_table_0.1 and freq from 01a-perSiteGLMM.R
-
 p_table_0.1$sort <- factor(p_table_0.1$snpid, levels = p_table_0.1[order(p_table_0.1$est.mean)]$snpid)
 limits <- aes(ymin = ci0.005, ymax = ci0.995, x = snpid)
+# generate Fig. 1b
 ggplot(data = p_table_0.1[neandIndicator == T], aes(x = sort, y = est.mean)) +
 	geom_point(size = 0.1) +
 	geom_errorbar(limits, size = 0.1) +
@@ -19,7 +21,6 @@ ggplot(data = p_table_0.1[neandIndicator == T], aes(x = sort, y = est.mean)) +
 	geom_hline(yintercept = null, color = "red")
 
 ase_results <- merge(p_table_0.1, freq, "snpid")
-
 ase_results$DERIVED_EUR_AF <- as.numeric(NA)
 ase_results[REF == ANCESTRAL]$DERIVED_EUR_AF <- ase_results[REF == ANCESTRAL]$EUR_AF
 ase_results[ALT == ANCESTRAL]$DERIVED_EUR_AF <- 1 - ase_results[ALT == ANCESTRAL]$EUR_AF
@@ -43,26 +44,24 @@ propDiffBin <- function(dt, minFreq, maxFreq) {
 
 diffByDAF <- do.call(rbind, lapply(seq(0, 1, 0.01), function(x) propDiffBin(ase_results, x, x + 0.01)))
 limits <- aes(ymin = CI0.025, ymax = CI0.975, x = (min + max) / 2)
-
-contrasts <- ggplot(data = diffByDAF[n_introgressed >= 20], aes(x = (min + max) / 2, y = CI0.5)) + 
+# generate Fig. 3b
+ggplot(data = diffByDAF[n_introgressed >= 20], aes(x = (min + max) / 2, y = CI0.5)) + 
 	geom_point() + 
 	geom_errorbar(limits) +
 	theme_bw() +
 	ylab(expression(paste(italic("p")["N"] - italic("p")["H"], " (95 % CI)"))) +
 	xlab("Derived Allele Frequency (EUR)") +
 	geom_hline(yintercept = 0, lty = "dashed", color = "red")
-	
-# plot frequency distributions
 
 gg_color_hue <- function(n) {
   hues = seq(15, 375, length = n + 1)
   hcl(h = hues, l = 65, c = 100)[1:n]
 }
-
 colors <- gg_color_hue(2)
 
 ase_results$relabel <- "Non-Introgressed"
-ase_results[neandIndicator == T]$relabel <- "Neand.-Introgressed"
+ase_results[neandIndicator == T]$relabel <- "Introgressed"
+# generate Fig. 3a
 ggplot(data = ase_results, aes(x = DERIVED_EUR_AF, fill = sig)) + 
 	geom_histogram(binwidth = 0.025, position = "stack") +
 	theme_bw() + 
