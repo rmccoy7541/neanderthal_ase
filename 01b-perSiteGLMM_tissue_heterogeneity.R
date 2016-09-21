@@ -1,6 +1,7 @@
 library(data.table)
-library(dtplyr)
+library(magrittr)
 library(parallel)
+library(dplyr)
 library(boot)
 library(INLA)
 
@@ -27,10 +28,10 @@ eur <- read.table("/net/akey/vol1/home/rcmccoy/ncbi/dbGaP-8037/files/eur.list", 
 eur <- as.vector(eur[['V1']])
 dt <- dt[SUBJECT_ID %in% eur]
 
-mixed_effect_model <- function(snp, dt, model_type) {
-	if (model_type == "tissue_subject") {
-		formula = ALT_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + TISSUE_ID
-	} else if (model_type == "tissue") {
+full_model <- function(snp, dt, model_type) {
+  if (model_type == "tissue_subject") {
+    formula = ALT_COUNT ~ 1 + f(SUBJECT_ID, model = "iid") + TISSUE_ID
+  } else if (model_type == "tissue") {
 		formula = ALT_COUNT ~ 1 + TISSUE_ID
 	}
 	m1 <- inla(formula, data = dt[mergeID == snp], family = "binomial", Ntrials = TOTAL_COUNT, 
@@ -38,7 +39,7 @@ mixed_effect_model <- function(snp, dt, model_type) {
 	return(m1)
 }
 
-null_model <- function(snp, dt, model_type) {
+reduced_model <- function(snp, dt, model_type) {
 	if (model_type == "tissue_subject") {
 		formula = ALT_COUNT ~ 1 + f(SUBJECT_ID, model = "iid")
 	} else if (model_type == "tissue") {
@@ -49,18 +50,18 @@ null_model <- function(snp, dt, model_type) {
 	return(m0)
 }
 
-glmer_ase <- function(snp, dt) {
+glmer_ase_tissue_het <- function(snp, dt) {
 	chrom <- unique(dt[mergeID == snp]$CHR[1])
 	pos <- unique(dt[mergeID == snp]$POS[1])
 	gene <- unique(dt[mergeID == snp]$GENE_ID)
 	# if one observation, fit model with only intercept
 	if (length(unique(dt[mergeID == snp]$TISSUE_ID)) > 1 & length(unique(dt[mergeID == snp]$SUBJECT_ID)) > 1) {
-		m1 <- mixed_effect_model(snp, dt, "tissue_subject")
-		m0 <- null_model(snp, dt, "tissue_subject")
+		m1 <- full_model(snp, dt, "tissue_subject")
+		m0 <- reduced_model(snp, dt, "tissue_subject")
 	# if only one level of subject, only include tissue random effect
 	} else if (length(unique(dt[mergeID == snp]$TISSUE_ID)) > 1 & length(unique(dt[mergeID == snp]$SUBJECT_ID)) == 1) {
-		m1 <- mixed_effect_model(snp, dt, "tissue")
-		m0 <- null_model(snp, dt, "tissue")
+		m1 <- full_model(snp, dt, "tissue")
+		m0 <- reduced_model(snp, dt, "tissue")
 	# if only one level of tissue, only include subject random effect
 	} else if (length(unique(dt[mergeID == snp]$TISSUE_ID)) == 1) {
 		stop("Only one tissue for this SNP.")
@@ -74,7 +75,9 @@ glmer_ase <- function(snp, dt) {
 	return(results)
 }
 
+# only fit tissue heterogeneity model to SNPs with >1 tissue
 n_tissues <- group_by(dt[neandIndicator == T], mergeID) %>%
   summarise(., n_tissues = length(unique(TISSUE_ID)))
+n_tissues <- data.table(n_tissues)
   
-tissue_het <- do.call(rbind, lapply(n_tissues[n_tissues > 1]$mergeID, function(x) glmer_ase(x, dt[neandIndicator == T])))
+tissue_het <- do.call(rbind, lapply(n_tissues[n_tissues > 1]$mergeID, function(x) glmer_ase_tissue_het(x, dt[neandIndicator == T])))
