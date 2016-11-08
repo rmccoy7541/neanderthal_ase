@@ -55,7 +55,8 @@ nSamples <- group_by(dt[neandIndicator == TRUE], TISSUE_ID) %>%
 	setorder(., nSamples)
 nSamples <- data.table(nSamples)
 
-m0_results[, TISSUE_ID := gsub("TISSUE_ID", "", TISSUE_ID)]
+m0_results[, TISSUE_ID := gsub("TISSUE_ID", "", TISSUE_ID)] %>%
+  setnames(., c("TISSUE_ID", "mean", "sd", "quant0.005", "quant0.025", "quant0.975", "quant0.995", "mode", "kld", "brainIndicator"))
 
 # require at least 10 samples per tissue for plotting
 m0_results <- m0_results[TISSUE_ID %in% nSamples[nSamples >= 10]$TISSUE_ID]
