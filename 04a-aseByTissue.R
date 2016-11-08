@@ -47,6 +47,17 @@ formula = DERIVED_COUNT ~ -1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model =
 m0 <- inla(formula, data = dt[neandIndicator == TRUE], family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
 m0_results <- data.table(TISSUE_ID = rownames(m0$summary.fixed), m0$summary.fixed)
 
+# load divergence per gene to test for potential confounding effects of mapping bias
+div <- fread("/net/akey/vol1/home/rcmccoy/vol2home/for_aaron/div_per_gene.txt") %>%
+  setnames(., c("GENE_ID", "div_sites", "len"))
+div[, div_per_gene := div_sites / len]
+dt_introgressed <- merge(dt[neandIndicator == T], div, "GENE_ID")
+
+formula = DERIVED_COUNT ~ -1 + f(SUBJECT_ID, model = "iid") + f(GENE_ID, model = "iid") + TISSUE_ID + div_per_gene
+m1 <- inla(formula, data = dt_introgressed, family = "binomial", Ntrials = TOTAL_COUNT, quantile = c(0.005, 0.025, 0.975, 0.995))
+m1_results <- data.table(fixed_variable = rownames(m1$summary.fixed), m1$summary.fixed)
+
+
 ### plot ASE by tissue ###
 
 nSamples <- group_by(dt[neandIndicator == TRUE], TISSUE_ID) %>%
@@ -63,10 +74,24 @@ m0_results <- m0_results[TISSUE_ID %in% nSamples[nSamples >= 10]$TISSUE_ID]
 m0_results[, brainIndicator := grepl("BRN", TISSUE_ID)]
 m0_results$TISSUE_ID <- factor(m0_results$TISSUE_ID, levels = m0_results$TISSUE_ID[order(m0_results$mean)])
 
-limits <- aes(x = TISSUE_ID, ymin = exp(quant0.005) / (1 + exp(quant0.005)), ymax = exp(quant0.995) / (1 + exp(quant0.995)))
+limits <- aes(x = TISSUE_ID, ymin = inv.logit(quant0.005), ymax = inv.logit(quant0.995))
 limits2 <- aes(x = TISSUE_ID, ymin = exp(quant0.025) / (1 + exp(quant0.025)), ymax = exp(quant0.975) / (1 + exp(quant0.975)))
 # generate Fig. 4a
 ggplot(data = m0_results, aes(x = TISSUE_ID, y = inv.logit(mean), color = factor(brainIndicator))) +
+	geom_point() +
+	geom_errorbar(limits) +
+	theme_bw() +
+	theme(axis.text.x=element_text(angle = 90, hjust = 0), legend.position = "none") +
+	ylab("Prop. Reads Supporting Neand. Allele (99% CI)") +
+	xlab("Tissue")
+
+m1_results[, brainIndicator := grepl("BRN", fixed_variable)]
+m1_results[, fixed_variable := gsub("TISSUE_ID", "", fixed_variable)] %>%
+  setnames(., c("TISSUE_ID", "mean", "sd", "quant0.005", "quant0.025", "quant0.975", "quant0.995", "mode", "kld", "brainIndicator"))
+# require at least 10 samples per tissue for plotting
+m1_results <- m1_results[TISSUE_ID %in% nSamples[nSamples >= 10]$TISSUE_ID]
+m1_results$TISSUE_ID <- factor(m1_results$TISSUE_ID, levels = m1_results$TISSUE_ID[order(m1_results$mean)])
+ggplot(data = m1_results, aes(x = TISSUE_ID, y = inv.logit(mean), color = factor(brainIndicator))) +
 	geom_point() +
 	geom_errorbar(limits) +
 	theme_bw() +
