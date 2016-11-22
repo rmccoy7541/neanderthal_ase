@@ -7,7 +7,7 @@ library(ggplot2)
 # start with p_table_0.1 and freq from 01a-perSiteGLMM.R
 p_table_0.1$sort <- factor(p_table_0.1$snpid, levels = p_table_0.1[order(p_table_0.1$est.mean)]$snpid)
 limits <- aes(ymin = ci0.005, ymax = ci0.995, x = snpid)
-# generate Fig. 1b
+# generate Fig. 2
 ggplot(data = p_table_0.1[neandIndicator == T], aes(x = sort, y = est.mean)) +
 	geom_point(size = 0.1) +
 	geom_errorbar(limits, size = 0.1) +
@@ -44,7 +44,7 @@ propDiffBin <- function(dt, minFreq, maxFreq) {
 
 diffByDAF <- do.call(rbind, lapply(seq(0, 1, 0.01), function(x) propDiffBin(ase_results, x, x + 0.01)))
 limits <- aes(ymin = CI0.025, ymax = CI0.975, x = (min + max) / 2)
-# generate Fig. 3b
+# generate Fig. 4b
 ggplot(data = diffByDAF[n_introgressed >= 20], aes(x = (min + max) / 2, y = CI0.5)) + 
 	geom_point() + 
 	geom_errorbar(limits) +
@@ -61,7 +61,7 @@ colors <- gg_color_hue(2)
 
 ase_results$relabel <- "Non-Introgressed"
 ase_results[neandIndicator == T]$relabel <- "Introgressed"
-# generate Fig. 3a
+# generate Fig. 4a
 ggplot(data = ase_results, aes(x = DERIVED_EUR_AF, fill = sig)) + 
 	geom_histogram(binwidth = 0.025, position = "stack") +
 	theme_bw() + 
