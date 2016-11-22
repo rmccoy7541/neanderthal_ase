@@ -51,7 +51,7 @@ y_imputed[is.na(y_imputed)] <- 0
 remove_snps <- apply(y_imputed, 1, function(x) sum(x == 0))
 y_imputed <- y_imputed[which(remove_snps != 14),]
 
-# generate Fig. 4b (upper panel)
+# generate Fig. 5b (upper panel)
 heatmap.2(y_imputed[rev(order(rowMeans(y_imputed))),], trace = "none", col = col.pan[c(1,3,5)], 
           density.info = "none", distfun = function(x) dist(x, method = "binary"), Rowv = F, labRow = "", 
           reorderfun = function(d, w) { reorder(d, c(13, 11, 14, 9, 7, 4, 6, 2, 12, 3, 8, 1, 5, 10), mean) })
@@ -74,7 +74,7 @@ ordered_tissues <- c(c("BRNSPC", "BRNSPC", "BRNSNG", "BRNSNG", "BRNAMY", "BRNAMY
                      melt_sig_by_tissue[!grepl("BRN|TESTIS", TISSUE)]$TISSUE)
 melt_sig_by_tissue$TISSUE_order <- factor(melt_sig_by_tissue$TISSUE, levels = ordered_tissues)
 
-# generate Fig. 4b (lower panel)
+# generate Fig. 5b (lower panel)
 ggplot(data = melt_sig_by_tissue[grepl("BRN|TESTIS", TISSUE)], 
        aes(x = TISSUE_order, y = value, fill = variable))  +
   theme_bw() +
