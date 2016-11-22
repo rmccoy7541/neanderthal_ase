@@ -76,7 +76,7 @@ m0_results$TISSUE_ID <- factor(m0_results$TISSUE_ID, levels = m0_results$TISSUE_
 
 limits <- aes(x = TISSUE_ID, ymin = inv.logit(quant0.005), ymax = inv.logit(quant0.995))
 limits2 <- aes(x = TISSUE_ID, ymin = exp(quant0.025) / (1 + exp(quant0.025)), ymax = exp(quant0.975) / (1 + exp(quant0.975)))
-# generate Fig. 4a
+# generate Fig. 5a
 ggplot(data = m0_results, aes(x = TISSUE_ID, y = inv.logit(mean), color = factor(brainIndicator))) +
 	geom_point() +
 	geom_errorbar(limits) +
